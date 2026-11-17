@@ -881,6 +881,7 @@ dependencies = [
  "thiserror",
  "zip",
  "zipsentinel-core",
+ "zipsentinel-guard",
 ]
 
 [[package]]

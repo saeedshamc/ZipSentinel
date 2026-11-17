@@ -8,6 +8,7 @@ description = "ZipSentinel generator"
 
 [dependencies]
 zipsentinel-core.workspace = true
+zipsentinel-guard.workspace = true
 zip.workspace = true
 rand.workspace = true
 tempfile.workspace = true
