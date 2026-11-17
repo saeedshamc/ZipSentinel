@@ -4,7 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "ZipSentinel cli"
+description = "ZipSentinel command-line interface"
+
+[[bin]]
+name = "zipsentinel"
+path = "src/main.rs"
 
 [dependencies]
 zipsentinel-core.workspace = true

@@ -155,12 +155,18 @@ fn extract_archive(
             continue;
         }
 
-        // Reject absolute paths and anything escaping output_dir.
+        // Reject absolute paths and anything escaping output_dir. Check the
+        // *relative* path components — the joined target is absolute by design.
         let target = output_dir.join(&rel);
         if rel.is_absolute()
-            || target
-                .components()
-                .any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_)))
+            || rel.components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir
+                        | std::path::Component::RootDir
+                        | std::path::Component::Prefix(_)
+                )
+            })
         {
             state.report.findings.push(format!(
                 "skipped entry escaping output directory: {raw_name:?}"
