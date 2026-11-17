@@ -1,5 +1,7 @@
 # ZipSentinel
 
+> فارسی: [README.fa.md](README.fa.md) | راهنمای build فارسی: [docs/build-guide.fa.md](docs/build-guide.fa.md)
+
 **Archive Security & Research Toolkit** — a Rust workspace for generating
 controlled ZIP test samples, analyzing archive structure, detecting potential
 ZIP bombs, and extracting untrusted archives under strict resource limits.
