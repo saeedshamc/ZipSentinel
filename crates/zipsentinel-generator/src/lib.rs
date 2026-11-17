@@ -190,7 +190,11 @@ fn build_nested(
         entries.push(EntrySpec {
             name: format!("leaf-{index}.txt"),
             method: CompressionMethod::Deflated,
-            data: gen_data(rng, DataKind::SemiCompressible, opts.payload_size.min(4096) as usize),
+            data: gen_data(
+                rng,
+                DataKind::SemiCompressible,
+                opts.payload_size.min(4096) as usize,
+            ),
         });
     } else {
         // One nested child plus a leaf sibling.
@@ -211,11 +215,13 @@ fn build_nested(
 }
 
 fn standard_entries(opts: &GenerateOptions, rng: &mut StdRng) -> Result<Vec<EntrySpec>, ZSError> {
+    // Moderate-entropy mix: compressible but not bomb-like, so the standard
+    // profile represents a benign baseline archive.
     let kinds = [
-        DataKind::Pattern,
         DataKind::SemiCompressible,
         DataKind::Random,
-        DataKind::Zeros,
+        DataKind::SemiCompressible,
+        DataKind::Random,
     ];
     let count = opts.entries.max(1);
     let per = (opts.payload_size / count as u64).max(1) as usize;
@@ -238,15 +244,20 @@ fn standard_entries(opts: &GenerateOptions, rng: &mut StdRng) -> Result<Vec<Entr
 fn high_compression_entries(opts: &GenerateOptions, rng: &mut StdRng) -> Vec<EntrySpec> {
     // Highly compressible payloads; sizes stay within uncompressed limits.
     let per = (opts.payload_size / 4).max(1024) as usize;
-    [DataKind::Zeros, DataKind::Pattern, DataKind::SemiCompressible, DataKind::Zeros]
-        .iter()
-        .enumerate()
-        .map(|(i, &kind)| EntrySpec {
-            name: format!("compressible-{i}.bin"),
-            method: CompressionMethod::Deflated,
-            data: gen_data(rng, kind, per),
-        })
-        .collect()
+    [
+        DataKind::Zeros,
+        DataKind::Pattern,
+        DataKind::SemiCompressible,
+        DataKind::Zeros,
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, &kind)| EntrySpec {
+        name: format!("compressible-{i}.bin"),
+        method: CompressionMethod::Deflated,
+        data: gen_data(rng, kind, per),
+    })
+    .collect()
 }
 
 fn many_files_entries(opts: &GenerateOptions, rng: &mut StdRng) -> Vec<EntrySpec> {

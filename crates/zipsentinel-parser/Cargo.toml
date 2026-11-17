@@ -11,3 +11,8 @@ zip.workspace = true
 zipsentinel-core.workspace = true
 thiserror.workspace = true
 serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+zip.workspace = true
+proptest = "1"

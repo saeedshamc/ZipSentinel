@@ -14,7 +14,7 @@ use zipsentinel_core::{
     Severity, ZSError,
 };
 use zipsentinel_guard::ResourceGuard;
-use zipsentinel_parser::{parse_bytes, parse_archive, ParsedArchive};
+use zipsentinel_parser::{ParsedArchive, parse_archive, parse_bytes};
 
 /// Tunable detection thresholds.
 #[derive(Debug, Clone)]
@@ -222,30 +222,31 @@ fn measure_entries(
 
     let mut actual_total = 0u64;
     let mut measured = 0u64;
-    let to_measure = metadata
-        .entries
-        .len()
-        .min(cfg.max_measure_entries as usize);
+    let to_measure = metadata.entries.len().min(cfg.max_measure_entries as usize);
 
     for i in 0..to_measure {
-        guard.check_time().map_err(|e| io::Error::other(e.to_string()))?;
+        guard
+            .check_time()
+            .map_err(|e| io::Error::other(e.to_string()))?;
         let mut entry = match archive.by_index(i) {
             Ok(e) => e,
             Err(err) => {
-                    findings.push(
-                        Finding::new(
-                            "ENTRY_READ_FAILURE",
-                            Severity::Medium,
-                            Confidence::Measured,
-                            format!("entry could not be opened for measurement: {err}"),
-                        )
-                        .for_entry(metadata.entries[i].name.clone()),
-                    );
-                    continue;
+                findings.push(
+                    Finding::new(
+                        "ENTRY_READ_FAILURE",
+                        Severity::Medium,
+                        Confidence::Measured,
+                        format!("entry could not be opened for measurement: {err}"),
+                    )
+                    .for_entry(metadata.entries[i].name.clone()),
+                );
+                continue;
             }
         };
         let declared = metadata.entries[i].uncompressed_size;
-        guard.check_entry_size(declared).map_err(|e| io::Error::other(e.to_string()))?;
+        guard
+            .check_entry_size(declared)
+            .map_err(|e| io::Error::other(e.to_string()))?;
 
         let mut buf = vec![0u8; 128 * 1024];
         let mut entry_actual = 0u64;
@@ -286,7 +287,7 @@ fn measure_entries(
             }
         }
         measured += 1;
-        if entry_actual != declared && entry_actual <= declared {
+        if entry_actual < declared {
             findings.push(
                 Finding::new(
                     "DECLARED_SIZE_MISMATCH",
@@ -391,7 +392,10 @@ pub fn detect(path: &Path, cfg: &DetectorConfig) -> Result<AnalysisResult, ZSErr
 }
 
 /// Runs detection over an already-parsed archive.
-pub fn detect_parsed(parsed: &ParsedArchive, cfg: &DetectorConfig) -> Result<AnalysisResult, ZSError> {
+pub fn detect_parsed(
+    parsed: &ParsedArchive,
+    cfg: &DetectorConfig,
+) -> Result<AnalysisResult, ZSError> {
     let mut findings = analyze(parsed, cfg.limits.max_entries);
     findings.extend(metadata_findings(&parsed.metadata, cfg));
 
@@ -400,7 +404,13 @@ pub fn detect_parsed(parsed: &ParsedArchive, cfg: &DetectorConfig) -> Result<Ana
     let mut nested_count = 0u64;
 
     if cfg.measure_decompression {
-        match measure_entries(&parsed.path, &parsed.metadata, cfg, &mut guard, &mut findings) {
+        match measure_entries(
+            &parsed.path,
+            &parsed.metadata,
+            cfg,
+            &mut guard,
+            &mut findings,
+        ) {
             Ok(stats) => {
                 if stats.actual_total > parsed.metadata.total_uncompressed {
                     findings.push(
@@ -416,7 +426,9 @@ pub fn detect_parsed(parsed: &ParsedArchive, cfg: &DetectorConfig) -> Result<Ana
                         ),
                     );
                 }
-                if stats.measured_entries > 0 && stats.measured_entries < parsed.metadata.entry_count {
+                if stats.measured_entries > 0
+                    && stats.measured_entries < parsed.metadata.entry_count
+                {
                     findings.push(Finding::new(
                         "PARTIAL_MEASUREMENT",
                         Severity::Info,
@@ -477,7 +489,11 @@ pub fn detect_parsed(parsed: &ParsedArchive, cfg: &DetectorConfig) -> Result<Ana
         );
     }
 
-    let score: f64 = findings.iter().map(|f| severity_weight(f.severity)).sum::<f64>().min(100.0);
+    let score: f64 = findings
+        .iter()
+        .map(|f| severity_weight(f.severity))
+        .sum::<f64>()
+        .min(100.0);
     let risk = score_to_risk(score, &findings);
 
     Ok(AnalysisResult {

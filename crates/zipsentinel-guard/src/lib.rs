@@ -46,13 +46,13 @@ impl ResourceGuard {
 
     /// Accounts `n` bytes of archive output (compressed side).
     pub fn consume_output(&mut self, n: u64) -> Result<(), ZSError> {
-        self.output_bytes = self
-            .output_bytes
-            .checked_add(n)
-            .ok_or_else(|| ZSError::LimitExceeded {
-                limit: "output byte counter".to_string(),
-                observed: u64::MAX.to_string(),
-            })?;
+        self.output_bytes =
+            self.output_bytes
+                .checked_add(n)
+                .ok_or_else(|| ZSError::LimitExceeded {
+                    limit: "output byte counter".to_string(),
+                    observed: u64::MAX.to_string(),
+                })?;
         if self.output_bytes > self.limits.max_output_bytes {
             return Err(ZSError::LimitExceeded {
                 limit: format!("max_output_bytes <= {}", self.limits.max_output_bytes),
@@ -65,13 +65,13 @@ impl ResourceGuard {
     /// Accounts `n` bytes of uncompressed payload actually produced/consumed.
     pub fn consume_uncompressed(&mut self, n: u64) -> Result<(), ZSError> {
         self.check_time()?;
-        self.uncompressed_bytes = self
-            .uncompressed_bytes
-            .checked_add(n)
-            .ok_or_else(|| ZSError::LimitExceeded {
-                limit: "uncompressed byte counter".to_string(),
-                observed: u64::MAX.to_string(),
-            })?;
+        self.uncompressed_bytes =
+            self.uncompressed_bytes
+                .checked_add(n)
+                .ok_or_else(|| ZSError::LimitExceeded {
+                    limit: "uncompressed byte counter".to_string(),
+                    observed: u64::MAX.to_string(),
+                })?;
         if self.uncompressed_bytes > self.limits.max_uncompressed_total {
             return Err(ZSError::LimitExceeded {
                 limit: format!(
@@ -141,7 +141,6 @@ pub struct GuardedWriter<W> {
     inner: W,
     guard: ResourceGuard,
     written: u64,
-    check_every: u64,
 }
 
 impl<W> GuardedWriter<W> {
@@ -150,7 +149,6 @@ impl<W> GuardedWriter<W> {
             inner,
             guard: ResourceGuard::new(limits),
             written: 0,
-            check_every: 64 * 1024,
         }
     }
 
@@ -176,9 +174,11 @@ impl<W: Write> Write for GuardedWriter<W> {
         self.guard.check_time().map_err(io::Error::other)?;
         let n = self.inner.write(buf)?;
         self.written += n as u64;
-        if self.written % self.check_every == 0 || n == buf.len() {
+        // Account only the bytes written by *this* call — `written` is
+        // cumulative and would otherwise be double-counted.
+        if n > 0 {
             self.guard
-                .consume_output(self.written)
+                .consume_output(n as u64)
                 .map_err(io::Error::other)?;
         }
         Ok(n)

@@ -1,6 +1,6 @@
 //! Report rendering: JSON, terminal, and HTML output for analysis results.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fmt::Write as _;
 use zipsentinel_core::{AnalysisResult, ExtractionReport, Finding, Severity};
 
@@ -18,13 +18,15 @@ fn severity_label(s: Severity) -> &'static str {
 pub fn to_json(result: &AnalysisResult) -> Value {
     json!({
         "path": result.path,
-        "risk": result.risk.as_str(),
+        "risk": result.risk,
         "score": result.score,
         "max_nested_depth": result.max_nested_depth,
         "nested_archive_count": result.nested_archive_count,
         "metadata": {
+            "path": result.metadata.path,
             "file_size": result.metadata.file_size,
             "entry_count": result.metadata.entry_count,
+            "eocd_offset": result.metadata.eocd_offset,
             "zip64": result.metadata.zip64,
             "total_compressed": result.metadata.total_compressed,
             "total_uncompressed": result.metadata.total_uncompressed,
@@ -34,8 +36,11 @@ pub fn to_json(result: &AnalysisResult) -> Value {
                 "compression_method": e.compression_method,
                 "compressed_size": e.compressed_size,
                 "uncompressed_size": e.uncompressed_size,
-                "compression_ratio": e.compression_ratio,
+                "crc32": e.crc32,
                 "encrypted": e.encrypted,
+                "data_descriptor": e.data_descriptor,
+                "utf8_names": e.utf8_names,
+                "compression_ratio": e.compression_ratio,
                 "nested_archive": e.nested_archive,
                 "local_header_offset": e.local_header_offset,
             })).collect::<Vec<_>>(),
@@ -65,7 +70,11 @@ pub fn render_terminal(result: &AnalysisResult) -> String {
     let _ = writeln!(out, "ZipSentinel Analysis Report");
     let _ = writeln!(out, "==========================");
     let _ = writeln!(out, "Archive: {}", result.path.display());
-    let _ = writeln!(out, "Risk:    {} (score {:.1}/100)", result.risk, result.score);
+    let _ = writeln!(
+        out,
+        "Risk:    {} (score {:.1}/100)",
+        result.risk, result.score
+    );
     let _ = writeln!(out);
     let m = &result.metadata;
     let _ = writeln!(out, "File size:            {} bytes", m.file_size);
@@ -91,7 +100,11 @@ pub fn render_terminal(result: &AnalysisResult) -> String {
                 zipsentinel_core::Confidence::Measured => "measured",
                 zipsentinel_core::Confidence::Estimated => "estimated",
             };
-            let entry = f.entry.as_deref().map(|e| format!(" [{e}]")).unwrap_or_default();
+            let entry = f
+                .entry
+                .as_deref()
+                .map(|e| format!(" [{e}]"))
+                .unwrap_or_default();
             let _ = writeln!(
                 out,
                 "  [{:8}] {:<36} {}{} ({})",
@@ -119,14 +132,21 @@ pub fn render_html(result: &AnalysisResult) -> String {
     let mut out = String::new();
     let risk_class = result.risk.as_str().to_lowercase().replace(' ', "-");
     let _ = writeln!(out, "<!DOCTYPE html>");
-    let _ = writeln!(out, "<html><head><meta charset=\"utf-8\"><title>ZipSentinel Report</title>");
+    let _ = writeln!(
+        out,
+        "<html><head><meta charset=\"utf-8\"><title>ZipSentinel Report</title>"
+    );
     let _ = writeln!(
         out,
         "<style>body{{font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ccc;padding:.3rem .6rem;text-align:left}}.risk-{risk_class}{{font-weight:700}}</style>"
     );
     let _ = writeln!(out, "</head><body>");
     let _ = writeln!(out, "<h1>ZipSentinel Analysis Report</h1>");
-    let _ = writeln!(out, "<p>Archive: <code>{}</code></p>", escape_html(&result.path.display().to_string()));
+    let _ = writeln!(
+        out,
+        "<p>Archive: <code>{}</code></p>",
+        escape_html(&result.path.display().to_string())
+    );
     let _ = writeln!(
         out,
         "<p class=\"risk-{risk_class}\">Risk: {} &mdash; score {:.1}/100</p>",
@@ -134,12 +154,28 @@ pub fn render_html(result: &AnalysisResult) -> String {
     );
     let m = &result.metadata;
     let _ = writeln!(out, "<table>");
-    let _ = writeln!(out, "<tr><th>File size</th><td>{} bytes</td></tr>", m.file_size);
+    let _ = writeln!(
+        out,
+        "<tr><th>File size</th><td>{} bytes</td></tr>",
+        m.file_size
+    );
     let _ = writeln!(out, "<tr><th>Entries</th><td>{}</td></tr>", m.entry_count);
-    let _ = writeln!(out, "<tr><th>Compressed total</th><td>{} bytes</td></tr>", m.total_compressed);
-    let _ = writeln!(out, "<tr><th>Uncompressed total</th><td>{} bytes</td></tr>", m.total_uncompressed);
+    let _ = writeln!(
+        out,
+        "<tr><th>Compressed total</th><td>{} bytes</td></tr>",
+        m.total_compressed
+    );
+    let _ = writeln!(
+        out,
+        "<tr><th>Uncompressed total</th><td>{} bytes</td></tr>",
+        m.total_uncompressed
+    );
     if let Some(r) = m.overall_ratio() {
-        let _ = writeln!(out, "<tr><th>Overall ratio (declared)</th><td>{:.2}x</td></tr>", r);
+        let _ = writeln!(
+            out,
+            "<tr><th>Overall ratio (declared)</th><td>{:.2}x</td></tr>",
+            r
+        );
     }
     let _ = writeln!(
         out,
@@ -148,7 +184,10 @@ pub fn render_html(result: &AnalysisResult) -> String {
     );
     let _ = writeln!(out, "</table>");
 
-    let _ = writeln!(out, "<h2>Entries</h2><table><tr><th>Name</th><th>Method</th><th>Compressed</th><th>Uncompressed</th><th>Ratio</th><th>Flags</th></tr>");
+    let _ = writeln!(
+        out,
+        "<h2>Entries</h2><table><tr><th>Name</th><th>Method</th><th>Compressed</th><th>Uncompressed</th><th>Ratio</th><th>Flags</th></tr>"
+    );
     for e in &m.entries {
         let mut flags = Vec::new();
         if e.encrypted {
@@ -174,7 +213,10 @@ pub fn render_html(result: &AnalysisResult) -> String {
     }
     let _ = writeln!(out, "</table>");
 
-    let _ = writeln!(out, "<h2>Findings</h2><table><tr><th>Severity</th><th>Code</th><th>Confidence</th><th>Message</th><th>Entry</th></tr>");
+    let _ = writeln!(
+        out,
+        "<h2>Findings</h2><table><tr><th>Severity</th><th>Code</th><th>Confidence</th><th>Message</th><th>Entry</th></tr>"
+    );
     for f in &result.findings {
         let conf = match f.confidence {
             zipsentinel_core::Confidence::Measured => "MEASURED",
@@ -201,7 +243,11 @@ pub fn render_extraction_terminal(report: &ExtractionReport) -> String {
     let _ = writeln!(out, "==================");
     let _ = writeln!(out, "Archive:   {}", report.archive.display());
     let _ = writeln!(out, "Output:    {}", report.output_dir.display());
-    let _ = writeln!(out, "Extracted: {} entries, {} bytes", report.entries_extracted, report.bytes_written);
+    let _ = writeln!(
+        out,
+        "Extracted: {} entries, {} bytes",
+        report.entries_extracted, report.bytes_written
+    );
     let _ = writeln!(out, "Skipped:   {} entries", report.skipped_entries);
     if !report.findings.is_empty() {
         let _ = writeln!(out, "Notes:");

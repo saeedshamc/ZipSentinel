@@ -14,3 +14,8 @@ rand.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+zip.workspace = true
+zipsentinel-parser.workspace = true

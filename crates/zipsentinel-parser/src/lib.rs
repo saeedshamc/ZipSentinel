@@ -34,7 +34,9 @@ pub struct ParsedArchive {
 /// Locates the End Of Central Directory record by scanning backwards from EOF.
 fn find_eocd(bytes: &[u8]) -> Result<usize, ZSError> {
     if bytes.len() < EOCD_MIN_LEN {
-        return Err(ZSError::malformed("file too small to contain an EOCD record"));
+        return Err(ZSError::malformed(
+            "file too small to contain an EOCD record",
+        ));
     }
     let search_start = bytes.len().saturating_sub(EOCD_MAX_SEARCH);
     let mut pos = bytes.len() - EOCD_MIN_LEN;
@@ -52,7 +54,9 @@ fn find_eocd(bytes: &[u8]) -> Result<usize, ZSError> {
         }
         pos -= 1;
     }
-    Err(ZSError::malformed("end of central directory record not found"))
+    Err(ZSError::malformed(
+        "end of central directory record not found",
+    ))
 }
 
 #[derive(Debug, Default)]
@@ -110,7 +114,12 @@ fn read_central_directory_info(bytes: &[u8], eocd: usize) -> Result<CentralDirec
             .try_into()
             .unwrap(),
     ) as usize;
-    let sig = u32::from_le_bytes([bytes[z64_off], bytes[z64_off + 1], bytes[z64_off + 2], bytes[z64_off + 3]]);
+    let sig = u32::from_le_bytes([
+        bytes[z64_off],
+        bytes[z64_off + 1],
+        bytes[z64_off + 2],
+        bytes[z64_off + 3],
+    ]);
     if sig != ZIP64_EOCD_SIG {
         return Err(ZSError::malformed("invalid ZIP64 EOCD signature"));
     }
@@ -141,7 +150,9 @@ fn apply_zip64_extra(
         let tag = u16::from_le_bytes([extra[cursor], extra[cursor + 1]]);
         let len = u16::from_le_bytes([extra[cursor + 2], extra[cursor + 3]]) as usize;
         let start = cursor + 4;
-        let end = start.checked_add(len).ok_or_else(|| ZSError::malformed("extra field overflow"))?;
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| ZSError::malformed("extra field overflow"))?;
         if end > extra.len() {
             return Err(ZSError::malformed("truncated extra field"));
         }
@@ -178,7 +189,10 @@ fn parse_central_directory(
 ) -> Result<Vec<EntryInfo>, ZSError> {
     if info.entry_count_total > limits.max_entries.saturating_mul(4).max(1_000_000) {
         return Err(ZSError::LimitExceeded {
-            limit: format!("central directory entries <= {}", limits.max_entries.saturating_mul(4)),
+            limit: format!(
+                "central directory entries <= {}",
+                limits.max_entries.saturating_mul(4)
+            ),
             observed: info.entry_count_total.to_string(),
         });
     }
@@ -188,10 +202,16 @@ fn parse_central_directory(
         .checked_add(usize::try_from(info.cd_size).unwrap_or(usize::MAX))
         .ok_or_else(|| ZSError::malformed("central directory size overflow"))?;
     if cd_end > bytes.len() {
-        return Err(ZSError::malformed("central directory extends past end of file"));
+        return Err(ZSError::malformed(
+            "central directory extends past end of file",
+        ));
     }
 
-    let mut entries = Vec::with_capacity(usize::try_from(info.entry_count_total).unwrap_or(0).min(4096));
+    let mut entries = Vec::with_capacity(
+        usize::try_from(info.entry_count_total)
+            .unwrap_or(0)
+            .min(4096),
+    );
     let mut pos = cd_offset;
     let mut seen = 0u64;
 
@@ -201,7 +221,8 @@ fn parse_central_directory(
             break;
         }
         let rd16 = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-        let rd32 = |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
+        let rd32 =
+            |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
 
         let flags = rd16(pos + 8) as u32;
         let method = rd16(pos + 10);
@@ -225,10 +246,17 @@ fn parse_central_directory(
             .checked_add(comment_len)
             .ok_or_else(|| ZSError::malformed("entry comment length overflow"))?;
         if next > cd_end || name_end > bytes.len() {
-            return Err(ZSError::malformed("central directory entry overruns record bounds"));
+            return Err(ZSError::malformed(
+                "central directory entry overruns record bounds",
+            ));
         }
 
-        apply_zip64_extra(&bytes[extra_start..extra_end], &mut uncompressed, &mut compressed, &mut local_offset)?;
+        apply_zip64_extra(
+            &bytes[extra_start..extra_end],
+            &mut uncompressed,
+            &mut compressed,
+            &mut local_offset,
+        )?;
 
         let raw_name = &bytes[name_start..name_end];
         let name = String::from_utf8_lossy(raw_name).into_owned();
@@ -271,7 +299,9 @@ fn local_data_offset(bytes: &[u8], local_offset: u64) -> Option<usize> {
     }
     let name_len = u16::from_le_bytes([bytes[off + 26], bytes[off + 27]]) as usize;
     let extra_len = u16::from_le_bytes([bytes[off + 28], bytes[off + 29]]) as usize;
-    off.checked_add(30)?.checked_add(name_len)?.checked_add(extra_len)
+    off.checked_add(30)?
+        .checked_add(name_len)?
+        .checked_add(extra_len)
 }
 
 /// Detects well-known archive/container magic at the start of entry data.
@@ -290,7 +320,11 @@ fn sniff_nested_magic(bytes: &[u8], data_off: usize) -> bool {
 
 /// Parses archive `bytes` (already loaded) into metadata. `display_name` is
 /// used only for reporting; the bytes are the source of truth.
-pub fn parse_bytes(display_name: &Path, bytes: &[u8], limits: &ResourceLimits) -> Result<ParsedArchive, ZSError> {
+pub fn parse_bytes(
+    display_name: &Path,
+    bytes: &[u8],
+    limits: &ResourceLimits,
+) -> Result<ParsedArchive, ZSError> {
     let owned = bytes.to_vec();
     parse_loaded(display_name.to_path_buf(), owned, limits)
 }
@@ -312,7 +346,11 @@ pub fn parse_archive(path: &Path, limits: &ResourceLimits) -> Result<ParsedArchi
     parse_loaded(path.to_path_buf(), bytes, limits)
 }
 
-fn parse_loaded(path: PathBuf, bytes: Vec<u8>, limits: &ResourceLimits) -> Result<ParsedArchive, ZSError> {
+fn parse_loaded(
+    path: PathBuf,
+    bytes: Vec<u8>,
+    limits: &ResourceLimits,
+) -> Result<ParsedArchive, ZSError> {
     let bytes_len = bytes.len();
 
     let eocd = find_eocd(&bytes)?;
@@ -334,8 +372,12 @@ fn parse_loaded(path: PathBuf, bytes: Vec<u8>, limits: &ResourceLimits) -> Resul
         entry.nested_archive = ext_match || magic_match;
     }
 
-    let total_uncompressed = entries.iter().try_fold(0u64, |acc, e| acc.checked_add(e.uncompressed_size));
-    let total_compressed = entries.iter().try_fold(0u64, |acc, e| acc.checked_add(e.compressed_size));
+    let total_uncompressed = entries
+        .iter()
+        .try_fold(0u64, |acc, e| acc.checked_add(e.uncompressed_size));
+    let total_compressed = entries
+        .iter()
+        .try_fold(0u64, |acc, e| acc.checked_add(e.compressed_size));
     let (total_uncompressed, total_compressed) = match (total_uncompressed, total_compressed) {
         (Some(u), Some(c)) => (u, c),
         _ => {
@@ -361,7 +403,9 @@ fn parse_loaded(path: PathBuf, bytes: Vec<u8>, limits: &ResourceLimits) -> Resul
 
 /// Cheap check whether a file looks like a ZIP archive (EOCD present).
 pub fn is_zip_file(path: &Path) -> bool {
-    let Ok(meta) = fs::metadata(path) else { return false };
+    let Ok(meta) = fs::metadata(path) else {
+        return false;
+    };
     if meta.len() < EOCD_MIN_LEN as u64 {
         return false;
     }

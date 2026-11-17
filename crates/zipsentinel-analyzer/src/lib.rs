@@ -105,7 +105,10 @@ pub fn analyze_metadata(metadata: &ArchiveMetadata) -> Vec<Finding> {
                     "UNSUPPORTED_COMPRESSION_METHOD",
                     Severity::High,
                     Confidence::Measured,
-                    format!("compression method {} is not supported", entry.compression_method),
+                    format!(
+                        "compression method {} is not supported",
+                        entry.compression_method
+                    ),
                 )
                 .for_entry(entry.name.clone()),
             );
@@ -183,7 +186,10 @@ pub fn analyze_metadata(metadata: &ArchiveMetadata) -> Vec<Finding> {
 
 /// Parses the local file header for `entry` and compares fields against the
 /// central directory record. Returns a finding on inconsistency.
-fn check_local_header(parsed: &ParsedArchive, entry: &zipsentinel_core::EntryInfo) -> Option<Finding> {
+fn check_local_header(
+    parsed: &ParsedArchive,
+    entry: &zipsentinel_core::EntryInfo,
+) -> Option<Finding> {
     let bytes = &parsed.bytes;
     let off = usize::try_from(entry.local_header_offset).ok()?;
     if off + 30 > bytes.len() {
@@ -278,7 +284,10 @@ pub fn analyze(parsed: &ParsedArchive, max_entries: u64) -> Vec<Finding> {
 }
 
 /// Convenience wrapper for callers holding only metadata.
-pub fn analyze_path(path: &Path, limits: &zipsentinel_core::ResourceLimits) -> Result<Vec<Finding>, zipsentinel_core::ZSError> {
+pub fn analyze_path(
+    path: &Path,
+    limits: &zipsentinel_core::ResourceLimits,
+) -> Result<Vec<Finding>, zipsentinel_core::ZSError> {
     let parsed = zipsentinel_parser::parse_archive(path, limits)?;
     Ok(analyze(&parsed, limits.max_entries))
 }

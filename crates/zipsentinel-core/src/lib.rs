@@ -104,7 +104,12 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn new(code: &str, severity: Severity, confidence: Confidence, message: impl Into<String>) -> Self {
+    pub fn new(
+        code: &str,
+        severity: Severity,
+        confidence: Confidence,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             code: code.to_string(),
             severity,

@@ -28,6 +28,26 @@ pub struct ExtractOptions {
     pub recursive: bool,
 }
 
+/// Normalizes a relative path for deduplication: drops `.` components and
+/// unifies separators so path-equivalent names collide.
+fn normalized_path_key(rel: &Path) -> String {
+    let key = rel
+        .components()
+        .filter_map(|c| match c {
+            std::path::Component::CurDir => None,
+            other => Some(other.as_os_str().to_string_lossy().replace('\\', "/")),
+        })
+        .collect::<Vec<_>>()
+        .join("/");
+    // Case-insensitive filesystems (Windows, default macOS) treat
+    // `A.txt`/`a.txt` as the same file; dedup must match FS semantics.
+    if cfg!(windows) || cfg!(target_os = "macos") {
+        key.to_lowercase()
+    } else {
+        key
+    }
+}
+
 fn is_nested_name(name: &str) -> bool {
     let lower = name.to_lowercase();
     NESTED_EXTENSIONS.iter().any(|e| lower.ends_with(e))
@@ -69,7 +89,9 @@ fn extract_entry<W: Read>(
     state.guard.check_time()?;
     state.guard.check_entry_size(declared_size)?;
 
-    let parent = target.parent().ok_or_else(|| ZSError::UnsafePath(target.to_path_buf()))?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| ZSError::UnsafePath(target.to_path_buf()))?;
     fs::create_dir_all(parent)?;
 
     let tmp = state.tmp_path(target);
@@ -83,9 +105,9 @@ fn extract_entry<W: Read>(
         let mut buf = vec![0u8; 128 * 1024];
         loop {
             state.guard.check_time()?;
-            let n = reader.read(&mut buf).map_err(|e| {
-                ZSError::parse(format!("read error on entry {entry_name:?}: {e}"))
-            })?;
+            let n = reader
+                .read(&mut buf)
+                .map_err(|e| ZSError::parse(format!("read error on entry {entry_name:?}: {e}")))?;
             if n == 0 {
                 break;
             }
@@ -117,8 +139,8 @@ fn extract_archive(
     fs::create_dir_all(output_dir)?;
 
     let file = File::open(archive_path)?;
-    let mut archive = ZipArchive::new(file)
-        .map_err(|e| ZSError::parse(format!("cannot open archive: {e}")))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| ZSError::parse(format!("cannot open archive: {e}")))?;
 
     for i in 0..archive.len() {
         state.guard.check_time()?;
@@ -137,17 +159,19 @@ fn extract_archive(
 
         let raw_name = zf.name().to_string();
         if let Some(reason) = unsafe_name_reason(&raw_name) {
-            state.report.findings.push(format!(
-                "skipped unsafe entry name {raw_name:?}: {reason}"
-            ));
+            state
+                .report
+                .findings
+                .push(format!("skipped unsafe entry name {raw_name:?}: {reason}"));
             state.report.skipped_entries += 1;
             continue;
         }
         // zip's enclosed_name additionally strips traversal components.
         let Some(rel) = zf.enclosed_name() else {
-            state.report.findings.push(format!(
-                "skipped entry with unsafe path: {raw_name:?}"
-            ));
+            state
+                .report
+                .findings
+                .push(format!("skipped entry with unsafe path: {raw_name:?}"));
             state.report.skipped_entries += 1;
             continue;
         };
@@ -178,19 +202,24 @@ fn extract_archive(
         // Symlink rejection via unix mode bits.
         if let Some(mode) = zf.unix_mode() {
             if mode & S_IFMT == S_IFLNK {
-                state.report.findings.push(format!(
-                    "skipped symlink entry: {raw_name:?}"
-                ));
+                state
+                    .report
+                    .findings
+                    .push(format!("skipped symlink entry: {raw_name:?}"));
                 state.report.skipped_entries += 1;
                 continue;
             }
         }
 
-        // Duplicate names: first wins, later duplicates are skipped.
-        if !state.seen_names.insert(raw_name.clone()) {
-            state.report.findings.push(format!(
-                "skipped duplicate entry name: {raw_name:?}"
-            ));
+        // Duplicate names: first wins, later duplicates are skipped. The key
+        // is the normalized enclosed path so `./a.txt`, `a.txt`, and
+        // case/path variants that resolve to the same file are deduplicated.
+        let dedup_key = normalized_path_key(&rel);
+        if !state.seen_names.insert(dedup_key) {
+            state
+                .report
+                .findings
+                .push(format!("skipped duplicate entry name: {raw_name:?}"));
             state.report.skipped_entries += 1;
             continue;
         }
@@ -217,9 +246,10 @@ fn extract_archive(
             match extract_archive(&target, &nested_out, state, depth + 1) {
                 Ok(()) => {}
                 Err(e) => {
-                    state.report.findings.push(format!(
-                        "nested extraction of {raw_name:?} failed: {e}"
-                    ));
+                    state
+                        .report
+                        .findings
+                        .push(format!("nested extraction of {raw_name:?} failed: {e}"));
                 }
             }
         }

@@ -7,14 +7,14 @@
 //!   3 - BLOCKED
 //!   4 - operational error
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 use zipsentinel_core::{AnalysisResult, ResourceLimits, RiskLevel};
-use zipsentinel_detector::{detect, DetectorConfig};
+use zipsentinel_detector::{DetectorConfig, detect};
 
 #[derive(Parser)]
 #[command(
@@ -230,7 +230,10 @@ fn run() -> Result<u8> {
             let cfg = detector_config(strict, !no_measure);
             let result = detect(&archive, &cfg).context("scan failed")?;
             if json {
-                println!("{}", serde_json::to_string_pretty(&zipsentinel_report::to_json(&result))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&zipsentinel_report::to_json(&result))?
+                );
             } else {
                 println!(
                     "{}: {} (score {:.1}) — {} entries, {} findings",
@@ -257,7 +260,10 @@ fn run() -> Result<u8> {
                 eprintln!("HTML report written to {}", out.display());
             }
             if json {
-                println!("{}", serde_json::to_string_pretty(&zipsentinel_report::to_json(&result))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&zipsentinel_report::to_json(&result))?
+                );
             } else {
                 print!("{}", zipsentinel_report::render_terminal(&result));
             }
@@ -273,7 +279,7 @@ fn run() -> Result<u8> {
             corruption,
             strict,
         } => {
-            use zipsentinel_generator::{generate, CorruptKind, GenerateOptions, Profile};
+            use zipsentinel_generator::{CorruptKind, GenerateOptions, Profile, generate};
             let profile = match profile {
                 ProfileArg::Standard => Profile::Standard,
                 ProfileArg::HighCompression => Profile::HighCompression,
@@ -314,7 +320,7 @@ fn run() -> Result<u8> {
             recursive,
             strict,
         } => {
-            use zipsentinel_extractor::{extract, ExtractOptions};
+            use zipsentinel_extractor::{ExtractOptions, extract};
             let opts = ExtractOptions {
                 archive: archive.clone(),
                 output_dir: output,
@@ -322,7 +328,10 @@ fn run() -> Result<u8> {
                 recursive,
             };
             let report = extract(&opts)?;
-            print!("{}", zipsentinel_report::render_extraction_terminal(&report));
+            print!(
+                "{}",
+                zipsentinel_report::render_extraction_terminal(&report)
+            );
             Ok(0)
         }
         Commands::Benchmark {
@@ -387,7 +396,10 @@ fn run() -> Result<u8> {
             if json {
                 println!("{}", serde_json::to_string_pretty(&rows)?);
             } else {
-                println!("{:>10} {:>12} {:>10} {:>10} {:>6}  {}", "parse_ms", "detect_ms", "size", "entries", "risk", "file");
+                println!(
+                    "{:>10} {:>12} {:>10} {:>10} {:>6}  file",
+                    "parse_ms", "detect_ms", "size", "entries", "risk"
+                );
                 for r in &rows {
                     println!(
                         "{:>10.2} {:>10.2} {:>12} {:>10} {:>6}  {}",
@@ -396,7 +408,10 @@ fn run() -> Result<u8> {
                         r.size_bytes,
                         r.entries,
                         r.risk,
-                        Path::new(&r.file).file_name().unwrap_or_default().to_string_lossy()
+                        Path::new(&r.file)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
                     );
                 }
             }
@@ -406,8 +421,8 @@ fn run() -> Result<u8> {
             let text = std::fs::read_to_string(&input)
                 .with_context(|| format!("cannot read {}", input.display()))?;
             let value: serde_json::Value = serde_json::from_str(&text)?;
-            let result: AnalysisResult = serde_json::from_value(value)
-                .context("input is not a ZipSentinel JSON report")?;
+            let result: AnalysisResult =
+                serde_json::from_value(value).context("input is not a ZipSentinel JSON report")?;
             if let Some(out) = html {
                 std::fs::write(&out, zipsentinel_report::render_html(&result))?;
                 eprintln!("HTML report written to {}", out.display());
