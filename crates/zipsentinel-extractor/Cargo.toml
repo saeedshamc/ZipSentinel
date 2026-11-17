@@ -1,0 +1,16 @@
+[package]
+name = "zipsentinel-extractor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "ZipSentinel extractor"
+
+[dependencies]
+zipsentinel-core.workspace = true
+zipsentinel-parser.workspace = true
+zipsentinel-guard.workspace = true
+zip.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+serde.workspace = true

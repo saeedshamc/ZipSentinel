@@ -1,0 +1,13 @@
+[package]
+name = "zipsentinel-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "ZipSentinel parser"
+
+[dependencies]
+zip.workspace = true
+zipsentinel-core.workspace = true
+thiserror.workspace = true
+serde.workspace = true

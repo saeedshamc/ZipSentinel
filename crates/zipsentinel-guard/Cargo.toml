@@ -1,0 +1,12 @@
+[package]
+name = "zipsentinel-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "ZipSentinel guard"
+
+[dependencies]
+zipsentinel-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

@@ -1,0 +1,47 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/zipsentinel-core",
+    "crates/zipsentinel-parser",
+    "crates/zipsentinel-analyzer",
+    "crates/zipsentinel-detector",
+    "crates/zipsentinel-generator",
+    "crates/zipsentinel-extractor",
+    "crates/zipsentinel-guard",
+    "crates/zipsentinel-report",
+    "crates/zipsentinel-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/zipsentinel/zipsentinel"
+rust-version = "1.85"
+
+[workspace.dependencies]
+zipsentinel-core = { path = "crates/zipsentinel-core" }
+zipsentinel-parser = { path = "crates/zipsentinel-parser" }
+zipsentinel-analyzer = { path = "crates/zipsentinel-analyzer" }
+zipsentinel-detector = { path = "crates/zipsentinel-detector" }
+zipsentinel-generator = { path = "crates/zipsentinel-generator" }
+zipsentinel-extractor = { path = "crates/zipsentinel-extractor" }
+zipsentinel-guard = { path = "crates/zipsentinel-guard" }
+zipsentinel-report = { path = "crates/zipsentinel-report" }
+
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+zip = { version = "2", default-features = false, features = ["deflate", "deflate64", "bzip2", "time"] }
+tempfile = "3"
+rand = "0.9"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
