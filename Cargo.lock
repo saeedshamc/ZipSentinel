@@ -853,8 +853,11 @@ name = "zipsentinel-detector"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "thiserror",
+ "zip",
  "zipsentinel-analyzer",
  "zipsentinel-core",
+ "zipsentinel-guard",
  "zipsentinel-parser",
 ]
 
@@ -866,6 +869,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "zip",
+ "zipsentinel-analyzer",
  "zipsentinel-core",
  "zipsentinel-guard",
  "zipsentinel-parser",

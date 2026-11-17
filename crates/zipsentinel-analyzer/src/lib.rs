@@ -13,7 +13,9 @@ use zipsentinel_parser::ParsedArchive;
 /// Compression methods we consider supported for measurement/extraction.
 pub const SUPPORTED_METHODS: &[u16] = &[0, 8]; // stored, deflate
 
-fn is_unsafe_name(name: &str) -> Option<&'static str> {
+/// Returns the reason an entry name violates path policy, or `None` if safe.
+/// Shared by the analyzer and the secure extractor.
+pub fn unsafe_name_reason(name: &str) -> Option<&'static str> {
     if name.contains('\0') {
         return Some("contains NUL byte");
     }
@@ -120,7 +122,7 @@ pub fn analyze_metadata(metadata: &ArchiveMetadata) -> Vec<Finding> {
                 .for_entry(entry.name.clone()),
             );
         }
-        if let Some(reason) = is_unsafe_name(&entry.name) {
+        if let Some(reason) = unsafe_name_reason(&entry.name) {
             unsafe_named += 1;
             findings.push(
                 Finding::new(

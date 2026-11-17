@@ -288,6 +288,13 @@ fn sniff_nested_magic(bytes: &[u8], data_off: usize) -> bool {
         || magic.starts_with(b"\xfd7zXZ")
 }
 
+/// Parses archive `bytes` (already loaded) into metadata. `display_name` is
+/// used only for reporting; the bytes are the source of truth.
+pub fn parse_bytes(display_name: &Path, bytes: &[u8], limits: &ResourceLimits) -> Result<ParsedArchive, ZSError> {
+    let owned = bytes.to_vec();
+    parse_loaded(display_name.to_path_buf(), owned, limits)
+}
+
 /// Parses `path` into an [`ArchiveMetadata`] structure.
 ///
 /// The entire file is read into memory; archives larger than
@@ -302,6 +309,10 @@ pub fn parse_archive(path: &Path, limits: &ResourceLimits) -> Result<ParsedArchi
     }
     let mut bytes = Vec::with_capacity(file_size as usize);
     fs::File::open(path)?.read_to_end(&mut bytes)?;
+    parse_loaded(path.to_path_buf(), bytes, limits)
+}
+
+fn parse_loaded(path: PathBuf, bytes: Vec<u8>, limits: &ResourceLimits) -> Result<ParsedArchive, ZSError> {
     let bytes_len = bytes.len();
 
     let eocd = find_eocd(&bytes)?;
@@ -333,7 +344,7 @@ pub fn parse_archive(path: &Path, limits: &ResourceLimits) -> Result<ParsedArchi
     };
 
     Ok(ParsedArchive {
-        path: path.to_path_buf(),
+        path: path.clone(),
         metadata: ArchiveMetadata {
             path: path.to_path_buf(),
             file_size: bytes_len as u64,
